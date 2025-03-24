@@ -19,7 +19,7 @@ def calculate_angle(a, b, c):
 
     return np.degrees(angle)
 
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 
 squat_score = 0
 prev_stage = ""
