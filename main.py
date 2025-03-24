@@ -26,6 +26,7 @@ NUM_TILE_TYPES = 79
 world = [] # list of chunks
 screen_scroll = 0
 scroll_offset = 0
+game_start = False
 
 
 # define player actions variables
@@ -93,6 +94,7 @@ class Runner(pygame.sprite.Sprite):
         self.jump = False
         self.in_air = True
         self.jump_type = 0 # 0 rise, 1 mid, 2 fall
+        self.pause_animation = False
 
         # animation
         self.animation_list = []
@@ -101,7 +103,7 @@ class Runner(pygame.sprite.Sprite):
         self.update_time = pygame.time.get_ticks()
 
         # load all animations for runner
-        animation_types = ['Idle', 'Run', 'JumpRise', 'JumpMid', 'JumpFall']
+        animation_types = ['Idle', 'Run', 'JumpRise', 'JumpMid', 'JumpFall', 'Knockback']
         for animation in animation_types:
             temp_animation = []
             num_of_frames = len(os.listdir(f'Images/Player/{animation}'))
@@ -117,6 +119,10 @@ class Runner(pygame.sprite.Sprite):
         self.rect.width = self.image.get_width() // 6
         self.rect.height = self.image.get_height() // 2
     
+    def update(self):
+        self.update_animation()
+        self.eliminate_if_applicable()
+
     def move(self, moving_left, moving_right):
         # reset movement valriables
         screen_scroll = 0
@@ -150,22 +156,32 @@ class Runner(pygame.sprite.Sprite):
         dy += self.vel_y
 
         # collision detection
-        for chunk in world:
-            for tile in chunk.obstacle_list:
-                # x direction
-                # the dx here is for future direction
-                if tile[1].colliderect(self.rect.x + dx, self.rect.y, self.rect.width, self.rect.height):
-                    dx = 0
-                # y direction
-                # print(self.rect.x, self.rect.y + dy, self.rect.width, self.rect.height)
-                if tile[1].colliderect(self.rect.x, self.rect.y + dy, self.rect.width, self.rect.height):
-                    if self.vel_y < 0: # jumping
-                        self.vel_y = 0
-                        dy = tile[1].bottom - self.rect.top
-                    elif self.vel_y >= 0: # falling
-                        self.vel_y = 0
-                        dy = tile[1].top - self.rect.bottom - 1
-                        self.in_air = False
+        if self.alive:
+            for chunk in world:
+                for tile in chunk.obstacle_list:
+                    # x direction
+                    # the dx here is for future direction
+                    if tile[1].colliderect(self.rect.x + dx, self.rect.y, self.rect.width, self.rect.height):
+                        dx = 0
+                        # if self.runner_type == 'player':
+                        #     self.alive = False
+                    # y direction
+                    # print(self.rect.x, self.rect.y + dy, self.rect.width, self.rect.height)
+                    if tile[1].colliderect(self.rect.x, self.rect.y + dy, self.rect.width, self.rect.height):
+                        if self.vel_y < 0: # jumping
+                            self.vel_y = 0
+                            dy = tile[1].bottom - self.rect.top
+                        elif self.vel_y >= 0: # falling
+                            self.vel_y = 0
+                            dy = tile[1].top - self.rect.bottom - 1
+                            self.in_air = False
+
+        if self.rect.bottom + 10 > SCREEN_HEIGHT:
+            self.alive = False
+
+        # don't go of the left edge
+        if self.rect.left + dx <= 0:
+            dx = 0
         
         # update rect
         self.rect.x += dx
@@ -173,7 +189,8 @@ class Runner(pygame.sprite.Sprite):
 
         # update scroll
         if self.runner_type == 'player':
-            if self.rect.right > SCREEN_WIDTH - SCROLL_DISTANCE_TRESH_RIGHT or (self.rect.left < SCROLL_DISTANCE_TRESH_LEFT and scroll_offset < 0): # < 0 is to stop scrolling on left edge
+            if self.rect.right > SCREEN_WIDTH - SCROLL_DISTANCE_TRESH_RIGHT \
+                or (self.rect.left < SCROLL_DISTANCE_TRESH_LEFT and scroll_offset < 0): # < 0 is to stop scrolling on left edge
                 self.rect.x -= dx
                 screen_scroll = -dx
         
@@ -185,8 +202,9 @@ class Runner(pygame.sprite.Sprite):
         self.image = self.animation_list[self.action][self.animation_index % len(self.animation_list[self.action])]
         #check if enough time has passed since last update
         if pygame.time.get_ticks() - self.update_time > ANIMATION_COOLDOWN:
-            self.animation_index += 1
-            self.update_time = pygame.time.get_ticks()
+            if not self.pause_animation or (self.animation_index % len(self.animation_list[self.action]) != len(self.animation_list[self.action]) - 1):
+                self.animation_index += 1
+                self.update_time = pygame.time.get_ticks()
             
     def update_action(self, new_action):
         # check if new action is different to current
@@ -195,6 +213,13 @@ class Runner(pygame.sprite.Sprite):
             # reset animation settings
             self.animation_index = 0
             self.update_time = pygame.time.get_ticks()
+    
+    def eliminate_if_applicable(self):
+        if not self.alive:
+            self.speed = 0
+            self.update_action(5)
+            self.pause_animation = True
+        return self.alive
 
     def draw(self):
         img_rect = self.image.get_rect()
@@ -239,7 +264,9 @@ class Chunk():
             tile[1].x += screen_scroll
             screen.blit(tile[0], tile[1])
 
-
+main_menu_img = pygame.image.load('Images/MainMenu.png').convert_alpha()
+main_menu_rect = main_menu_img.get_rect()
+main_menu_rect.center = screen.get_rect().center
 
 player = Runner('player', 10 * TILE_SIZE, 11 * TILE_SIZE, 3, 10)
 
@@ -283,7 +310,6 @@ def add_chunks(num, last_chunk_index):
         chunk_data = random.choice(chunk_datas)
         chunk.process_data(chunk_data)
         world.append(chunk) # randomely populate
-    print(index)
     return index
     
 last_chunk_index = add_chunks(1, last_chunk_index)
@@ -293,35 +319,39 @@ num_backgrounds = 2 # this is not number of layers, but number of backgrounds si
 is_game_running = True
 while is_game_running:
 
-    # update background
-    if -scroll_offset > bg_images[0].get_width() * (num_backgrounds - 2):
-        num_backgrounds += 1
-    draw_bg(num_backgrounds) # used to clear the screen
-
     clock.tick(FPS) # I think it waits to make sure there is a max of 60 frames per second
 
-    if player.rect.left > world[-1].x:
-        last_chunk_index = add_chunks(1, last_chunk_index)
+    if game_start == False:
+        screen.blit(main_menu_img, main_menu_rect)
+    else:
+        # update background
+        if -scroll_offset > bg_images[0].get_width() * (num_backgrounds - 2):
+            num_backgrounds += 1
+        draw_bg(num_backgrounds) # used to clear the screen
 
-    # draw chunks
-    for chunk in world:
-        chunk.draw()
+
+        if player.rect.left > world[-1].x:
+            last_chunk_index = add_chunks(1, last_chunk_index)
+
+        # draw chunks
+        for chunk in world:
+            chunk.draw()
 
 
-    player.update_animation()
-    player.draw()
+        player.update()
+        player.draw()
 
-    if player.alive:
-        #update player actions
-        if player.in_air:
-            player.update_action(2 + player.jump_type) # jump animation
-        elif moving_left or moving_right:
-            player.update_action(1) # run animation
-        else:
-            player.update_action(0) # idle
+        if player.alive:
+            #update player actions
+            if player.in_air:
+                player.update_action(2 + player.jump_type) # jump animation
+            elif moving_left or moving_right:
+                player.update_action(1) # run animation
+            else:
+                player.update_action(0) # idle
 
-    screen_scroll = player.move(moving_left, moving_right)
-    scroll_offset += screen_scroll
+        screen_scroll = player.move(moving_left, moving_right)
+        scroll_offset += screen_scroll
 
     for event in pygame.event.get():
         # quit game
@@ -338,6 +368,8 @@ while is_game_running:
                 player.jump = True
             if event.key == pygame.K_ESCAPE:
                 is_game_running = False
+            if event.key == pygame.K_SPACE and game_start == False:
+                game_start = True
         # keyboard unpress
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_a:

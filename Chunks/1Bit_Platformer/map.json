@@ -3310,7 +3310,7 @@
           "y": 24
         }
       ],
-      "collider": true
+      "collider": false
     },
     {
       "name": "Background",
