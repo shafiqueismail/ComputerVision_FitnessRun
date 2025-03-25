@@ -1,9 +1,13 @@
 import pygame
+from pygame import mixer
 import os
 import json
 import random
 
+mixer.init()
 pygame.init()
+
+# pygame.mixer.Sound('')
 
 screen = pygame.display.set_mode((0, 0), pygame.RESIZABLE)
 
@@ -16,18 +20,28 @@ FPS = 60
 # define game variables
 GRAVITY = 0.75
 SCREEN_WIDTH = pygame.display.get_surface().get_size()[0] 
-SCREEN_HEIGHT = pygame.display.get_surface().get_size()[1] #this gets the hight, if the screen gets resized maybe we shold reinitialize this
+SCREEN_HEIGHT = pygame.display.get_surface().get_size()[1] #this gets the hight, if the screen gets resized maybe we should reinitialize this
 SCROLL_DISTANCE_TRESH_LEFT = 200
 SCROLL_DISTANCE_TRESH_RIGHT = SCREEN_WIDTH // 2
 CHUNK_ROWS = 27
 CHUNK_COLS = 49
+FONT = pygame.font.SysFont('Consolas', 40)
 TILE_SIZE = SCREEN_HEIGHT // CHUNK_ROWS
 NUM_TILE_TYPES = 79
 world = [] # list of chunks
 screen_scroll = 0
 scroll_offset = 0
 game_start = False
+score = 0
+high_score = 0
 
+# colors
+BLACK = (0,0,0)
+WHITE = (255,255,255)
+BG_COLOR = (144, 201, 120)
+GREY = (213, 220, 227)
+# BG_COLOR = (0, 0, 0)
+LINE_COLOR = (255, 255, 255)
 
 # define player actions variables
 moving_left = False
@@ -53,25 +67,26 @@ for path in bg_images_paths:
     )
     bg_images.append(img)
 
-# load tile images
-def get_image(sheet, cols, width, height, color, image_index):
-    image = pygame.Surface((width, height)).convert_alpha() # this creates a blank image, we will use this as a window to get part of our spread sheet
-    # like screen because its also a surface
-    image.blit(sheet, (0,0), (image_index % cols * width, image_index // cols * height, width, height))
-    image = pygame.transform.scale(image, (TILE_SIZE, TILE_SIZE))
-    image.set_colorkey(color) # makes this color transparent?
-    return image
 
-BLACK = (0,0,0)
+def draw_text(text, font, text_color, x, y):
+    img = font.render(text, True, text_color)
+    screen.blit(img, (x,y))
 
-chunk_spritesheet = pygame.image.load('Chunks/1Bit_Platformer/spritesheet.png').convert_alpha()
-tile_img_list = []
-for i in range(NUM_TILE_TYPES):
-    tile_img_list.append(get_image(chunk_spritesheet, 8, 16, 16, BLACK, i))
+def draw_text_with_outline(text, font, text_color, outline_color, x, y,):
+    thickness = 3
+    draw_text(text, font, outline_color, x - thickness, y)
+    draw_text(text, font, outline_color, x, y - thickness)
+    draw_text(text, font, outline_color, x - thickness, y - thickness)
+    draw_text(text, font, outline_color, x + thickness, y)
+    draw_text(text, font, outline_color, x, y + thickness)
+    draw_text(text, font, outline_color, x + thickness, y + thickness)
+    draw_text(text, font, outline_color, x + thickness, y - thickness)
+    draw_text(text, font, outline_color, x - thickness, y + thickness)
+    draw_text(text, font, text_color, x, y)
 
-BG_COLOR = (144, 201, 120)
-# BG_COLOR = (0, 0, 0)
-LINE_COLOR = (255, 255, 255)
+def draw_score():
+    draw_text_with_outline('Score ' + str(score), FONT, GREY, BLACK, 10, 10)
+    draw_text_with_outline('Best ' + str(high_score), FONT, GREY, BLACK, 10, 60)
 
 def draw_bg(number):
     screen.fill(BG_COLOR)
@@ -241,10 +256,10 @@ class Chunk():
         self.index = index
         self.x = index * TILE_SIZE * CHUNK_COLS + scroll_offset
     
-    def process_data(self, data):
+    def process_data(self, data, tile_img_list):
         for y, row in enumerate(data):
             for x, (tile_id, is_collider) in enumerate(row):
-                if tile_id >= 0: # ignore -1
+                if tile_id >= 0 and tile_id < len(tile_img_list): # ignore -1
                     img = tile_img_list[tile_id]
                     img_rect = img.get_rect()
                     img_rect.x = x * TILE_SIZE
@@ -268,114 +283,176 @@ main_menu_img = pygame.image.load('Images/MainMenu.png').convert_alpha()
 main_menu_rect = main_menu_img.get_rect()
 main_menu_rect.center = screen.get_rect().center
 
-player = Runner('player', 10 * TILE_SIZE, 11 * TILE_SIZE, 3, 10)
+restart_menu_img = pygame.image.load('Images/RestartMenu.png').convert_alpha()
+restart_menu_rect = restart_menu_img.get_rect()
+restart_menu_rect.center = screen.get_rect().center
+
+# get highscore
+if os.path.exists('score.txt'):
+    with open('score.txt', 'r') as file:
+        try:
+            high_score = int(file.read())
+        except ValueError:
+            high_score = 0
+else:
+    high_score = 0
+
+
+# load tile images
+def get_image(sheet, cols, width, height, color, image_index):
+    image = pygame.Surface((width, height)).convert_alpha() # this creates a blank image, we will use this as a window to get part of our spread sheet
+    # like screen because its also a surface
+    image.blit(sheet, (0,0), (image_index % cols * width, image_index // cols * height, width, height))
+    image = pygame.transform.scale(image, (TILE_SIZE, TILE_SIZE))
+    image.set_colorkey(color) # makes this color transparent?
+    return image
 
 chunk_datas = []
+num_chunks = len(os.listdir('Chunks/'))
+for i in range(num_chunks):
+    # create empty chunk
+    chunk_data = []
+    for row in range(CHUNK_ROWS):
+        r = [(-1, False)] * CHUNK_COLS
+        chunk_data.append(r)
 
-# create empty chunk
-chunk_data = []
-for row in range(CHUNK_ROWS):
-    r = [-1] * CHUNK_COLS
-    chunk_data.append(r)
+    # load chunk
+    with open(f'Chunks/{str(i)}/map.json') as file:
+        data = json.load(file)
+        for layer in data['layers']:
+            for tile in layer['tiles']:
+                x = tile['x']
+                y = tile['y']
+                if x < CHUNK_COLS and y < CHUNK_ROWS and chunk_data[y][x][0] == -1: # IMPORTANT: it seems first layer is closer to the screen so this works
+                    chunk_data[y][x] = (int(tile['id']), layer['collider'])
 
-# load chunk
-with open('Chunks/1Bit_Platformer/map.json') as file:
-    data = json.load(file)
-    for layer in data['layers']:
-        for tile in layer['tiles']:
-            x = tile['x']
-            y = tile['y']
-            if x < CHUNK_COLS and y < CHUNK_ROWS and chunk_data[y][x] == -1: # IMPORTANT: it seems first layer is closer to the screen so this works
-                chunk_data[y][x] = (int(tile['id']), layer['collider'])
+    chunk_spritesheet = pygame.image.load(f'Chunks/{str(i)}/spritesheet.png').convert_alpha()
+    tile_img_list = []
+    for i in range(NUM_TILE_TYPES):
+        tile_img_list.append(get_image(chunk_spritesheet, 8, 16, 16, BLACK, i))
 
-chunk_datas.append(chunk_data)
+    chunk_datas.append((chunk_data, tile_img_list))
 
-# for row in chunk_data:
-#     nums = []
-#     for num in row:
-#         nums.append(num[0])
-#     print(nums)
+# Debugging
+for row in chunk_data:
+    nums = []
+    for num in row:
+        nums.append(num[0])
+    print(nums)
 
+quit = False
+while not quit:
+    #reset varibles
+    moving_left = False
+    moving_right = False
+    world = [] # list of chunks
+    screen_scroll = 0
+    scroll_offset = 0
 
-chunk0 = Chunk(0)
-chunk0.process_data(chunk_datas[0])
-world.append(chunk0) # always start with the first chunk, maybe add a starter chunk later
+    player = Runner('player', 10 * TILE_SIZE, 11 * TILE_SIZE, 3, 10)
 
-last_chunk_index = 0
-def add_chunks(num, last_chunk_index):
-    index = last_chunk_index
-    for _ in range(num): # higher number more chunks
-        index += 1
-        chunk = Chunk(index)
-        chunk_data = random.choice(chunk_datas)
-        chunk.process_data(chunk_data)
-        world.append(chunk) # randomely populate
-    return index
-    
-last_chunk_index = add_chunks(1, last_chunk_index)
+    chunk0 = Chunk(0)
+    data, tile_img_list = chunk_datas[0]
+    chunk0.process_data(data, tile_img_list)
+    world.append(chunk0) # always start with the first chunk, maybe add a starter chunk later
 
-num_backgrounds = 2 # this is not number of layers, but number of backgrounds side by side
-
-is_game_running = True
-while is_game_running:
-
-    clock.tick(FPS) # I think it waits to make sure there is a max of 60 frames per second
-
-    if game_start == False:
-        screen.blit(main_menu_img, main_menu_rect)
-    else:
-        # update background
-        if -scroll_offset > bg_images[0].get_width() * (num_backgrounds - 2):
-            num_backgrounds += 1
-        draw_bg(num_backgrounds) # used to clear the screen
-
-
-        if player.rect.left > world[-1].x:
-            last_chunk_index = add_chunks(1, last_chunk_index)
-
-        # draw chunks
-        for chunk in world:
-            chunk.draw()
-
-
-        player.update()
-        player.draw()
-
-        if player.alive:
-            #update player actions
-            if player.in_air:
-                player.update_action(2 + player.jump_type) # jump animation
-            elif moving_left or moving_right:
-                player.update_action(1) # run animation
-            else:
-                player.update_action(0) # idle
-
-        screen_scroll = player.move(moving_left, moving_right)
-        scroll_offset += screen_scroll
-
-    for event in pygame.event.get():
-        # quit game
-        if event.type == pygame.QUIT:
-            is_game_running = False
+    last_chunk_index = 0
+    def add_chunks(num, last_chunk_index):
+        index = last_chunk_index
+        for _ in range(num): # higher number more chunks
+            index += 1
+            chunk = Chunk(index)
+            data, tile_img_list = random.choice(chunk_datas)
+            chunk.process_data(data, tile_img_list)
+            world.append(chunk) # randomely populate
+        return index
         
-        # keyboard press
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_a:
-                moving_left = True
-            if event.key == pygame.K_d:
-                moving_right = True
-            if event.key == pygame.K_w and player.alive:
-                player.jump = True
-            if event.key == pygame.K_ESCAPE:
-                is_game_running = False
-            if event.key == pygame.K_SPACE and game_start == False:
-                game_start = True
-        # keyboard unpress
-        if event.type == pygame.KEYUP:
-            if event.key == pygame.K_a:
-                moving_left = False
-            if event.key == pygame.K_d:
-                moving_right = False
-    pygame.display.update() # update the screen
+    last_chunk_index = add_chunks(1, last_chunk_index)
+
+    num_backgrounds = 2 # this is not number of layers, but number of backgrounds side by side
+
+    is_game_loop_running = True
+    while is_game_loop_running:
+
+        clock.tick(FPS) # I think it waits to make sure there is a max of 60 frames per second
+
+        if game_start == False:
+            screen.fill(BLACK)
+            screen.blit(main_menu_img, main_menu_rect)
+        else:
+            # update background
+            if -scroll_offset > bg_images[0].get_width() * (num_backgrounds - 2):
+                num_backgrounds += 1
+            draw_bg(num_backgrounds) # used to clear the screen
+
+
+            if player.rect.left > world[-1].x:
+                last_chunk_index = add_chunks(1, last_chunk_index)
+
+            # draw chunks
+            for chunk in world:
+                chunk.draw()
+
+
+            player.update()
+            player.draw()
+
+            draw_score()
+
+            if player.alive:
+                #update player actions
+                if player.in_air:
+                    player.update_action(2 + player.jump_type) # jump animation
+                elif moving_left or moving_right:
+                    player.update_action(1) # run animation
+                else:
+                    player.update_action(0) # idle
+            else:
+                screen.blit(restart_menu_img, restart_menu_rect)
+
+
+            screen_scroll = player.move(moving_left, moving_right)
+            scroll_offset += screen_scroll
+            score = -scroll_offset
+            high_score = score if score > high_score else high_score
+
+        for event in pygame.event.get():
+            # quit game
+            if event.type == pygame.QUIT:
+                is_game_loop_running = False
+                quit = True
+            
+            # keyboard press
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_a:
+                    moving_left = True
+                if event.key == pygame.K_d:
+                    moving_right = True
+                if event.key == pygame.K_w and player.alive:
+                    player.jump = True
+                if event.key == pygame.K_ESCAPE:
+                    is_game_loop_running = False
+                    quit = True
+                if event.key == pygame.K_SPACE and game_start == False:
+                    game_start = True
+                if event.key == pygame.K_r and player.alive == False:
+                    is_game_loop_running = False
+                if event.key == pygame.K_m and player.alive == False:
+                    is_game_loop_running = False
+                    game_start = False
+                # return to main menu or restart
+ 
+            # keyboard unpress
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_a:
+                    moving_left = False
+                if event.key == pygame.K_d:
+                    moving_right = False
+        pygame.display.update() # update the screen
+
+# save highscore
+
+with open('score.txt', 'w') as file:
+    file.write(str(high_score))
 
 pygame.quit()
