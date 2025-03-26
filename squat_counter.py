@@ -21,7 +21,7 @@ def calculate_angle(a, b, c):
 
     return np.degrees(angle)
 
-def squat_detector(frame_queue, squat_queue, stop_event): #, image_width, image_height):
+def squat_detector(frame_queue, squat_queue, stop_event):
     cap = cv2.VideoCapture(0)  # Change to 0 if needed
     pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
@@ -96,8 +96,6 @@ def squat_detector(frame_queue, squat_queue, stop_event): #, image_width, image_
                                   mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
                                   mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2))
 
-        # Resize for Pygame display
-        # image = cv2.resize(image, (image_width, image_height))
         frame_queue.put(image)  # Send frame to Pygame
 
     cap.release()

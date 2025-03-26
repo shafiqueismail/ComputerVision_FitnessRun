@@ -6,10 +6,6 @@ import random
 from squat_counter import squat_detector
 import multiprocessing
 import numpy as np
-# from squat_counter import SquatCounter
-# import numpy as np
-# import multiprocessing
-# import cv2
 
 if __name__ == '__main__':
     multiprocessing.freeze_support() 
@@ -344,23 +340,12 @@ if __name__ == '__main__':
 
         chunk_datas.append((chunk_data, tile_img_list))
 
-    # def get_cv_image_later(cv_squat_counter, q):
-    #     cv_image_rgb, is_cv_jump = cv_squat_counter.get_cv_output()
-    #     q.put((cv_image_rgb, is_cv_jump))
-
-    # q = multiprocessing.Queue()
-    # processes = []
-    # cap = cv2.VideoCapture(0)
-    # cv_squat_counter = SquatCounter(cap)
-
     # Debugging
     # for row in chunk_data:
     #     nums = []
     #     for num in row:
     #         nums.append(num[0])
     #     print(nums)
-
-    # cv_process_started = False
 
     frame_queue = multiprocessing.Queue()
     squat_queue = multiprocessing.Queue()
@@ -379,7 +364,7 @@ if __name__ == '__main__':
         screen_scroll = 0
         scroll_offset = 0
 
-        player = Runner('player', 10 * TILE_SIZE, 11 * TILE_SIZE, 3, 10)
+        player = Runner('player', 10 * TILE_SIZE, 11 * TILE_SIZE, 3, 7)
 
         chunk0 = Chunk(0)
         data, tile_img_list = chunk_datas[0]
@@ -430,21 +415,8 @@ if __name__ == '__main__':
 
                 draw_score()
 
-                # if q.empty() and not cv_process_started:
-                #     cv_process_started = True
-                #     process = multiprocessing.Process(target=get_cv_image_later, args=(cv_squat_counter, q,))
-                #     process.start()
-                #     processes.append(process)
-                # elif not q.empty() and cv_process_started:
+                # vvv CV
 
-                #     cv_process_started = False
-                #     cv_image_rgb, is_cv_jump = q.get()
-                #     cv_image_rgb = np.rot90(cv_image_rgb)
-                #     cv_image = pygame.surfarray.make_surface(cv_image_rgb).convert_alpha()
-                #     cv_image = pygame.transform.flip(cv_image, True, False)
-                #     screen.blit(cv_image, (0,0))
-
-                # Get latest camera frame (non-blocking)
                 while not frame_queue.empty() and is_game_loop_running:
                     frame = frame_queue.get()
                     if not frame_queue.empty():
@@ -475,9 +447,7 @@ if __name__ == '__main__':
                         player.jump = True
                         auto_run = True
                 
-                #hello
-                #hello
-                #hello
+                # ^^^ CV
                 
                 if player.alive:
                     #update player actions
@@ -541,9 +511,6 @@ if __name__ == '__main__':
     with open('score.txt', 'w') as file:
         file.write(str(high_score))
 
-    # for process in processes:
-    #     process.join()
-    # cv_squat_counter.close()
     stop_squat_detector_event.set()
     squat_process.join()
     pygame.quit()
