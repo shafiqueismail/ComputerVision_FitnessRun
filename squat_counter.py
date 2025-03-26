@@ -2,10 +2,28 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import time
+import os
+import signal
 
-class SquatCounter():
-    mp_drawing = mp.solutions.drawing_utils
-    mp_pose = mp.solutions.pose
+mp_drawing = mp.solutions.drawing_utils
+mp_pose = mp.solutions.pose
+
+def calculate_angle(a, b, c):
+    a = np.array(a)
+    b = np.array(b)
+    c = np.array(c)
+
+    ba = a - b
+    bc = c - b
+
+    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+    angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
+
+    return np.degrees(angle)
+
+def squat_detector(frame_queue, squat_queue, stop_event): #, image_width, image_height):
+    cap = cv2.VideoCapture(0)  # Change to 0 if needed
+    pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
     squat_score = 0
     prev_stage = ""
@@ -16,111 +34,71 @@ class SquatCounter():
     start_time = time.time()
     countdown_time = 5  # Reduced to 5 seconds
 
-    def __init__(self, cap):
-        self.cap = cap
+    while cap.isOpened() and not stop_event.is_set():
+        ret, frame = cap.read()
+        if not ret:
+            continue
 
-    
-    def get_cv_output(self): # returns image and jump or not
-        with SquatCounter.mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
-            is_jump = False
-            ret, frame = self.cap.read()
-            if not ret:
-                print("Failed to capture frame")
-                return (None, False)
+        frame = cv2.flip(frame, 1)  # Mirror effect
+        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            frame = cv2.flip(frame, 1)
-            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image.flags.writeable = False
+        results = pose.process(image)
 
-            results = pose.process(image)
-            image.flags.writeable = True
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        text_coords = (170, 20)
 
-            elapsed_time = time.time() - SquatCounter.start_time
-            if elapsed_time < SquatCounter.countdown_time:
-                cv2.putText(image, f"Starting in {int(SquatCounter.countdown_time - elapsed_time)} sec", (10, 50), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-            else:
-                try:
-                    landmarks = results.pose_landmarks.landmark
-                    
-                    # Get points for angle calculations
-                    hip = [landmarks[SquatCounter.mp_pose.PoseLandmark.LEFT_HIP.value].x, landmarks[SquatCounter.mp_pose.PoseLandmark.LEFT_HIP.value].y]
-                    knee = [landmarks[SquatCounter.mp_pose.PoseLandmark.LEFT_KNEE.value].x, landmarks[SquatCounter.mp_pose.PoseLandmark.LEFT_KNEE.value].y]
-                    ankle = [landmarks[SquatCounter.mp_pose.PoseLandmark.LEFT_ANKLE.value].x, landmarks[SquatCounter.mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
+        elapsed_time = time.time() - start_time
+        if not results.pose_landmarks: 
+            cv2.putText(image, 'Get Farther From Camera!', text_coords, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)    
+        elif elapsed_time < countdown_time:
+            cv2.putText(image, f"Starting in {int(countdown_time - elapsed_time)} sec", text_coords, 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+        else:
+            try:
 
-                    # Calculate knee angle
-                    knee_angle = SquatCounter.calculate_angle(hip, knee, ankle)
-
-                    detected_stage = ""
-
-                    # Super Lenient Squat Detection: Knee angle ≤ 150°
-                    if knee_angle <= 150:
-                        detected_stage = "Squat"
-                    
-                    # Ensure stable transition by confirming over multiple frames
-                    if detected_stage == SquatCounter.prev_stage:
-                        SquatCounter.frame_count += 1
-                    else:
-                        SquatCounter.frame_count = 0  
-
-                    if SquatCounter.frame_count >= SquatCounter.transition_threshold:
-                        if detected_stage != SquatCounter.scored_stage:
-                            if detected_stage == "Squat":
-                                SquatCounter.squat_score += 1
-                                is_jump = True
-                            SquatCounter.scored_stage = detected_stage
-                        SquatCounter.frame_count = 0
-
-                    SquatCounter.prev_stage = detected_stage
-
-                    cv2.putText(image, f'Squat Score: {SquatCounter.squat_score}', (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                landmarks = results.pose_landmarks.landmark
                 
-                except Exception as e:
-                    print("Error:", e)
+                # Get points for angle calculations
+                hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x, landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
+                knee = [landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].x, landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].y]
+                ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x, landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
 
-            SquatCounter.mp_drawing.draw_landmarks(image, results.pose_landmarks, SquatCounter.mp_pose.POSE_CONNECTIONS,
-                                        SquatCounter.mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
-                                        SquatCounter.mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2))
+                # Calculate knee angle
+                knee_angle = calculate_angle(hip, knee, ankle)
+
+                detected_stage = ""
+
+                # Super Lenient Squat Detection: Knee angle ≤ 150°
+                if knee_angle <= 150:
+                    detected_stage = "Squat"
+                
+                # Ensure stable transition by confirming over multiple frames
+                if detected_stage == prev_stage:
+                    frame_count += 1
+                else:
+                    frame_count = 0  
+
+                if frame_count >= transition_threshold:
+                    if detected_stage != scored_stage:
+                        if detected_stage == "Squat":
+                            squat_score += 1
+                            squat_queue.put(True)
+                        scored_stage = detected_stage
+                    frame_count = 0
+
+                prev_stage = detected_stage
+
+                cv2.putText(image, f'Squat Score: {squat_score}', text_coords, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
             
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            except Exception as e:
+                print("Error:", e)
 
-            return (image, is_jump)
+            mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                                  mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
+                                  mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2))
 
-    @staticmethod
-    def calculate_angle(a, b, c):
-        a = np.array(a)  # First point
-        b = np.array(b)  # Middle joint (reference point)
-        c = np.array(c)  # Last point
+        # Resize for Pygame display
+        # image = cv2.resize(image, (image_width, image_height))
+        frame_queue.put(image)  # Send frame to Pygame
 
-        ba = a - b
-        bc = c - b
-
-        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-        angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))  # Clip to avoid NaN errors
-
-        return np.degrees(angle)
-    
-    def close(self):
-        self.cap.release()
-        cv2.destroyAllWindows()
-
-
-if __name__ == '__main__':
-    cap = cv2.VideoCapture(0)
-
-    cv_squat_counter = SquatCounter(cap)
-
-    while cv_squat_counter.cap.isOpened():
-        
-        image, is_jump =  cv_squat_counter.get_cv_output()
-
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-        cv2.imshow("Mediapipe Feed", image)
-
-        if cv2.waitKey(10) & 0xFF == ord("q"):
-            break
-
-    cv_squat_counter.cap.release()
-    cv2.destroyAllWindows()
+    cap.release()
+    os.kill(os.getpid(), signal.SIGTERM) # for some reason open cv doesnt close unless you force it

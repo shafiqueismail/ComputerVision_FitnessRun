@@ -3,7 +3,7 @@ from pygame import mixer
 import os
 import json
 import random
-from new_squat_counter import squat_detector
+from squat_counter import squat_detector
 import multiprocessing
 import numpy as np
 # from squat_counter import SquatCounter
@@ -56,6 +56,7 @@ if __name__ == '__main__':
     # define player actions variables
     moving_left = False
     moving_right = False
+    auto_run = False
 
     # load BG images
     bg_images = []
@@ -363,8 +364,9 @@ if __name__ == '__main__':
 
     frame_queue = multiprocessing.Queue()
     squat_queue = multiprocessing.Queue()
+    stop_squat_detector_event = multiprocessing.Event()
 
-    squat_process = multiprocessing.Process(target=squat_detector, args=(frame_queue, squat_queue))
+    squat_process = multiprocessing.Process(target=squat_detector, args=(frame_queue, squat_queue, stop_squat_detector_event,))
     squat_process.start()
 
     quit = False
@@ -372,6 +374,7 @@ if __name__ == '__main__':
         #reset varibles
         moving_left = False
         moving_right = False
+        auto_run = False
         world = [] # list of chunks
         screen_scroll = 0
         scroll_offset = 0
@@ -442,19 +445,35 @@ if __name__ == '__main__':
                 #     screen.blit(cv_image, (0,0))
 
                 # Get latest camera frame (non-blocking)
-                while not frame_queue.empty():
+                while not frame_queue.empty() and is_game_loop_running:
                     frame = frame_queue.get()
+                    if not frame_queue.empty():
+                        continue
                     frame = np.rot90(frame)  # Rotate for correct orientation
                     cam_surface = pygame.surfarray.make_surface(frame)
+                    cam_surface = pygame.transform.flip(cam_surface, True, False)
+                    height = SCREEN_HEIGHT // 2
+                    width = int(cam_surface.get_width() * (height / cam_surface.get_height()))
+                    cam_surface = pygame.transform.scale(cam_surface, (width, height))
+                    cam_surface_cropped = pygame.Surface((width // 2, height))
+                    cam_rect = cam_surface.get_rect()
+                    cam_rect.center = cam_surface_cropped.get_rect().center
+                    cam_surface_cropped.blit(cam_surface, cam_rect)
+                    cam_surface = cam_surface_cropped
 
+                # draw cv
                 if cam_surface:
-                    screen.blit(cam_surface, (0, 0))  # Show camera feed
+                    cam_rect = cam_surface.get_rect()
+                    cam_rect.top = 0
+                    cam_rect.right = SCREEN_WIDTH
+                    screen.blit(cam_surface, cam_rect)  # Show camera feed
 
                 # Check squat detection (non-blocking)
                 if not squat_queue.empty():
                     squat_detected = squat_queue.get()
                     if squat_detected:
                         player.jump = True
+                        auto_run = True
                 
                 #hello
                 #hello
@@ -476,6 +495,10 @@ if __name__ == '__main__':
                 scroll_offset += screen_scroll
                 score = -scroll_offset
                 high_score = score if score > high_score else high_score
+            
+            if auto_run:
+                moving_right = True
+                moving_left = False
 
             for event in pygame.event.get():
                 # quit game
@@ -485,12 +508,13 @@ if __name__ == '__main__':
                 
                 # keyboard press
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_a:
-                        moving_left = True
-                    if event.key == pygame.K_d:
-                        moving_right = True
-                    if event.key == pygame.K_w and player.alive:
-                        player.jump = True
+                    if not auto_run:
+                        if event.key == pygame.K_a:
+                            moving_left = True
+                        if event.key == pygame.K_d:
+                            moving_right = True
+                        if event.key == pygame.K_w and player.alive:
+                            player.jump = True
                     if event.key == pygame.K_ESCAPE:
                         is_game_loop_running = False
                         quit = True
@@ -505,21 +529,21 @@ if __name__ == '__main__':
     
                 # keyboard unpress
                 if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_a:
-                        moving_left = False
-                    if event.key == pygame.K_d:
-                        moving_right = False
+                    if not auto_run:
+                        if event.key == pygame.K_a:
+                            moving_left = False
+                        if event.key == pygame.K_d:
+                            moving_right = False
             pygame.display.update() # update the screen
 
 
     # save highscore
-
     with open('score.txt', 'w') as file:
         file.write(str(high_score))
 
     # for process in processes:
     #     process.join()
     # cv_squat_counter.close()
-    squat_process.terminate()
+    stop_squat_detector_event.set()
     squat_process.join()
     pygame.quit()
