@@ -64,17 +64,13 @@ def squat_detector(frame_queue, squat_queue, stop_event):
         elapsed_time = time.time() - start_time
         if not results.pose_landmarks: 
             cv2.putText(image, 'Get Farther From Camera!', text_coords, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)    
-        elif elapsed_time < countdown_time:
-            cv2.putText(image, f"Starting in {int(countdown_time - elapsed_time)} sec", text_coords, 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+        # elif elapsed_time < countdown_time: # count down before allowing squat detector to work
+        #     cv2.putText(image, f"Starting in {int(countdown_time - elapsed_time)} sec", text_coords, 
+        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
         else:
             try:
 
                 landmarks = results.pose_landmarks.landmark
-
-                print(landmarks[mp_pose.PoseLandmark.LEFT_HIP.value])
-
-                nose_value = landmarks[mp_pose.PoseLandmark.NOSE.value]
                 
                 # LEFT
                 # Get points for angle calculations
@@ -102,8 +98,6 @@ def squat_detector(frame_queue, squat_queue, stop_event):
 
                 detected_stage = ""
 
-                print(left_knee_angle, right_knee_angle)
-
                 # Super Lenient Squat Detection: Knee angle ≤ 150°
                 if left_knee_angle <= 50 and right_knee_angle <= 50: #the model is not super accurate
                     detected_stage = "Squat"
@@ -124,13 +118,15 @@ def squat_detector(frame_queue, squat_queue, stop_event):
 
                 prev_stage = detected_stage
 
-                cv2.putText(image, f'Squat Score: {squat_score}', text_coords, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-                cv2.putText(image, f'Left Angle {left_knee_angle}', (text_coords[0], text_coords[1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-                cv2.putText(image, f'Right Angle {right_knee_angle}', (text_coords[0], text_coords[1] + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-                cv2.putText(image, f'Visibility right ankle, left ankle, nose', (text_coords[0], text_coords[1] + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-                cv2.putText(image, f'{right_ankle_value.visibility}', (text_coords[0], text_coords[1] + 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-                cv2.putText(image, f'{left_ankle_value.visibility}', (text_coords[0], text_coords[1] + 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-                cv2.putText(image, f'{nose_value.visibility}', (text_coords[0], text_coords[1] + 130), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                # Debugging
+                # nose_value = landmarks[mp_pose.PoseLandmark.NOSE.value]
+                # cv2.putText(image, f'Squat Score: {squat_score}', text_coords, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                # cv2.putText(image, f'Left Angle {left_knee_angle}', (text_coords[0], text_coords[1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                # cv2.putText(image, f'Right Angle {right_knee_angle}', (text_coords[0], text_coords[1] + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                # cv2.putText(image, f'Visibility right ankle, left ankle, nose', (text_coords[0], text_coords[1] + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                # cv2.putText(image, f'{right_ankle_value.visibility}', (text_coords[0], text_coords[1] + 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                # cv2.putText(image, f'{left_ankle_value.visibility}', (text_coords[0], text_coords[1] + 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                # cv2.putText(image, f'{nose_value.visibility}', (text_coords[0], text_coords[1] + 130), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
             
             except Exception as e:
                 print("Error:", e)
