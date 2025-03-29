@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # pygame.mixer.Sound('')
 
-    screen = pygame.display.set_mode((0, 0), pygame.RESIZABLE)
+    screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
 
     pygame.display.set_caption('Project Run')
 
@@ -40,6 +40,7 @@ if __name__ == '__main__':
     game_start = False
     score = 0
     high_score = 0
+    squat_count = 0
 
     # colors
     BLACK = (0,0,0)
@@ -94,6 +95,7 @@ if __name__ == '__main__':
     def draw_score():
         draw_text_with_outline('Score ' + str(score), FONT, GREY, BLACK, 10, 10)
         draw_text_with_outline('Best ' + str(high_score), FONT, GREY, BLACK, 10, 60)
+        draw_text_with_outline('Squat Count ' + str(squat_count), FONT, GREY, BLACK, 10, 110)
 
     def draw_bg(number):
         screen.fill(BG_COLOR)
@@ -387,6 +389,8 @@ if __name__ == '__main__':
         num_backgrounds = 2 # this is not number of layers, but number of backgrounds side by side
 
         cam_surface = None
+        could_not_find_cam = False
+        waiting_for_squat_detector = True
 
         is_game_loop_running = True
         while is_game_loop_running:
@@ -416,9 +420,19 @@ if __name__ == '__main__':
                 draw_score()
 
                 # vvv CV
+                
+                if could_not_find_cam:
+                    draw_text_with_outline("Could Not Find Camera!", FONT, GREY, BLACK, 10, SCREEN_HEIGHT - 60)
+                elif waiting_for_squat_detector:
+                    draw_text_with_outline("Waiting for Squat Detector to Initialize...", FONT, GREY, BLACK, 10, SCREEN_HEIGHT - 60)
+                elif not auto_run:
+                    draw_text_with_outline("Do a Squat to Activate Auto Running!", FONT, GREY, BLACK, 10, SCREEN_HEIGHT - 60)
 
                 while not frame_queue.empty() and is_game_loop_running:
                     frame = frame_queue.get()
+                    if frame is None:
+                        could_not_find_cam = True
+                        break
                     if not frame_queue.empty():
                         continue
                     frame = np.rot90(frame)  # Rotate for correct orientation
@@ -439,6 +453,7 @@ if __name__ == '__main__':
                     cam_rect.top = 0
                     cam_rect.right = SCREEN_WIDTH
                     screen.blit(cam_surface, cam_rect)  # Show camera feed
+                    waiting_for_squat_detector = False
 
                 # Check squat detection (non-blocking)
                 if not squat_queue.empty():
@@ -446,6 +461,7 @@ if __name__ == '__main__':
                     if squat_detected:
                         player.jump = True
                         auto_run = True
+                        squat_count += 1
                 
                 # ^^^ CV
                 
@@ -506,6 +522,9 @@ if __name__ == '__main__':
                             moving_right = False
             pygame.display.update() # update the screen
 
+    screen.fill(BLACK)
+    draw_text_with_outline("Closing...", FONT, GREY, BLACK, 10, SCREEN_HEIGHT - 60)
+    pygame.display.update()
 
     # save highscore
     with open('score.txt', 'w') as file:

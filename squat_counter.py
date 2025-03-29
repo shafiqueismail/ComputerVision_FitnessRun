@@ -21,14 +21,29 @@ def calculate_angle(a, b, c):
 
     return np.degrees(angle)
 
+
+def find_working_camera(max_cameras=10):
+    for i in range(max_cameras):
+        cap = cv2.VideoCapture(i)
+        if cap.isOpened():
+            print(f"Using camera index: {i}")
+            return cap 
+        cap.release()
+    print("No working camera found.")
+    return None
+
 def squat_detector(frame_queue, squat_queue, stop_event):
-    cap = cv2.VideoCapture(0)  # Change to 0 if needed
+    # cap = cv2.VideoCapture(0)  # Change to 0 if needed
+    cap = find_working_camera()
+    if cap == None:
+        frame_queue.put(None)
+        return
     pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
     squat_score = 0
     prev_stage = ""
     scored_stage = ""
-    transition_threshold = 2  # Frames needed to confirm transition
+    transition_threshold = 5 # Frames needed to confirm transition
     frame_count = 0
 
     start_time = time.time()
@@ -56,19 +71,41 @@ def squat_detector(frame_queue, squat_queue, stop_event):
             try:
 
                 landmarks = results.pose_landmarks.landmark
+
+                print(landmarks[mp_pose.PoseLandmark.LEFT_HIP.value])
+
+                nose_value = landmarks[mp_pose.PoseLandmark.NOSE.value]
                 
+                # LEFT
                 # Get points for angle calculations
-                hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x, landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
-                knee = [landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].x, landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].y]
-                ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x, landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
+                left_hip_value = landmarks[mp_pose.PoseLandmark.LEFT_HIP.value]
+                left_hip = [left_hip_value.x, left_hip_value.y, left_hip_value.z]
+                left_knee_value = landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value]
+                left_knee = [left_knee_value.x, left_knee_value.y, left_knee_value.z]
+                left_ankle_value = landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value]
+                left_ankle = [left_ankle_value.x, left_ankle_value.y, left_ankle_value.z]
 
                 # Calculate knee angle
-                knee_angle = calculate_angle(hip, knee, ankle)
+                left_knee_angle = calculate_angle(left_hip, left_knee, left_ankle)
+
+                # RIGHT
+                # Get points for angle calculations
+                right_hip_value = landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value]
+                right_hip = [right_hip_value.x, right_hip_value.y, right_hip_value.z]
+                right_knee_value = landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value]
+                right_knee = [right_knee_value.x, right_knee_value.y, right_knee_value.z]
+                right_ankle_value = landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value]
+                right_ankle = [right_ankle_value.x, right_ankle_value.y, right_ankle_value.z]
+
+                # Calculate knee angle
+                right_knee_angle = calculate_angle(right_hip, right_knee, right_ankle)
 
                 detected_stage = ""
 
+                print(left_knee_angle, right_knee_angle)
+
                 # Super Lenient Squat Detection: Knee angle ≤ 150°
-                if knee_angle <= 150:
+                if left_knee_angle <= 50 and right_knee_angle <= 50: #the model is not super accurate
                     detected_stage = "Squat"
                 
                 # Ensure stable transition by confirming over multiple frames
@@ -88,6 +125,12 @@ def squat_detector(frame_queue, squat_queue, stop_event):
                 prev_stage = detected_stage
 
                 cv2.putText(image, f'Squat Score: {squat_score}', text_coords, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                cv2.putText(image, f'Left Angle {left_knee_angle}', (text_coords[0], text_coords[1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                cv2.putText(image, f'Right Angle {right_knee_angle}', (text_coords[0], text_coords[1] + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                cv2.putText(image, f'Visibility right ankle, left ankle, nose', (text_coords[0], text_coords[1] + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                cv2.putText(image, f'{right_ankle_value.visibility}', (text_coords[0], text_coords[1] + 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                cv2.putText(image, f'{left_ankle_value.visibility}', (text_coords[0], text_coords[1] + 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                cv2.putText(image, f'{nose_value.visibility}', (text_coords[0], text_coords[1] + 130), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
             
             except Exception as e:
                 print("Error:", e)
