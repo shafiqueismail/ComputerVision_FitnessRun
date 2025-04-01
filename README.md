@@ -26,3 +26,5 @@ https://www.youtube.com/watch?v=M6e3_8LHc7A
 https://www.youtube.com/watch?v=DCqV1ARz-Yw
 
 Chatgpt
+
+Some of the art assets used are paid so do not distribute them.
