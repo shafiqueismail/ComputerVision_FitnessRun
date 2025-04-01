@@ -14,6 +14,9 @@ https://docs.python.org/3/library/venv.html
 Then install the dependencies:
 pip install -r requirements.txt
 
+Then you can run:
+python main.py
+
 # Setup intellisence for vscode:
 https://stackoverflow.com/a/49893298
 
