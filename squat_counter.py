@@ -26,14 +26,15 @@ def find_working_camera(max_cameras=10):
     for i in range(max_cameras):
         cap = cv2.VideoCapture(i)
         if cap.isOpened():
-            print(f"Using camera index: {i}")
-            return cap 
+            ret, _ = cap.read()
+            if ret:
+                print(f"Using camera index: {i}")
+                return cap 
         cap.release()
     print("No working camera found.")
     return None
 
 def squat_detector(frame_queue, squat_queue, stop_event):
-    # cap = cv2.VideoCapture(0)  # Change to 0 if needed
     cap = find_working_camera()
     if cap == None:
         frame_queue.put(None)

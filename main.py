@@ -1,5 +1,4 @@
 import pygame
-from pygame import mixer
 import os
 import json
 import random
@@ -8,14 +7,10 @@ import multiprocessing
 import numpy as np
 
 if __name__ == '__main__':
-    multiprocessing.freeze_support() 
-
-    mixer.init()
+    multiprocessing.freeze_support()
     pygame.init()
 
-    # pygame.mixer.Sound('')
-
-    screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
+    screen = pygame.display.set_mode((0,0), pygame.RESIZABLE)
 
     pygame.display.set_caption('Project Run')
 
@@ -175,7 +170,7 @@ if __name__ == '__main__':
                 self.jump_type = 1 # jump mid
             if self.vel_y > 5: 
                 self.jump_type = 2 # jump fall
-            if self.vel_y > 10: # so its not too fast, can remove this later
+            if self.vel_y > 10: # add a cap
                 self.vel_y = 10 
             dy += self.vel_y
 
