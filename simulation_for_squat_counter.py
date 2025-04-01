@@ -1,4 +1,3 @@
-import numpy as np
 import random
 import matplotlib.pyplot as plt
 from collections import Counter
@@ -161,3 +160,4 @@ if __name__ == "__main__":
         bad_squat_rate=0.05,
         dropout_rate=0.025
     )
+

@@ -99,7 +99,7 @@ def squat_detector(frame_queue, squat_queue, stop_event):
 
                 detected_stage = ""
 
-                # Super Lenient Squat Detection: Knee angle ≤ 150°
+                # We chose 50 degrees for the squat when playing the game because the model is not always accurate when the user faces the camera 
                 if left_knee_angle <= 50 and right_knee_angle <= 50: #the model is not super accurate
                     detected_stage = "Squat"
                 

@@ -17,6 +17,9 @@ pip install -r requirements.txt
 Then you can run:
 python main.py
 
+# You can run a simulation for the squat counter
+python simulation_for_squat_counter.py
+
 # Setup intellisence for vscode:
 https://stackoverflow.com/a/49893298
 
