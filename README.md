@@ -43,3 +43,5 @@ Some of the art assets used are paid so do not distribute them.
 
 We also generally used youtube and google searches for looking up how to do different things.
 
+Custom model images taken from H&M, Forever21, Simons, and general google search.
+
