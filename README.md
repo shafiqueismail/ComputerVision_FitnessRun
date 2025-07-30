@@ -1,3 +1,7 @@
+Computer Vision Fitness Runner
+Project Run is a real-time pose-controlled endless runner game built in Python using Pygame and OpenCV. Instead of using keyboard inputs, the game detects real squats via webcam and uses them to control the character. This gamifies fitness through computer vision and AI!
+
+
 # Setup:
 
 Install venv: 
