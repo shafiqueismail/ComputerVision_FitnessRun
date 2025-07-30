@@ -21,6 +21,8 @@ pip install -r requirements.txt
 
 Finally, you can than run the game on your local computer by running this file **"main.py"**
 
+## Run the custom landmark detection model
+python3 ./CustomModels/landMark_DetectionModel/testModel.py
 
 
 
@@ -65,7 +67,7 @@ Each image is labeled with 6 keypoints (12 values: x1, y1, ..., x6, y6). Some po
 - **Loss Function:** Mean Squared Error (MSE), masked to ignore missing keypoints
 - **Optimizer:** Adam (learning rate = 1e-4)
 
-4. **📈 Training**
+4. **Training**
    - 20 epochs
    - Batches of 16
    - Prints masked average loss per epoch
@@ -78,38 +80,6 @@ Each image is labeled with 6 keypoints (12 values: x1, y1, ..., x6, y6). Some po
      - Estimates → Red Xs
    - Average accuracy + distance printed
 
-
-
-## Setup:
-
-First install the venv: 
-https://pypi.org/project/virtualenv/
-
-You should use python version 3.10.x
-
-Then run:
-python -m venv .venv
-
-activate the environment (check the table with "Command to activate virtual environment"):
-https://docs.python.org/3/library/venv.html
-
-Then install the dependencies:
-pip install -r requirements.txt 
-
-Then you can run the game:
-python main.py
-
-# You can run a simulation for the squat counter
-python simulation_for_squat_counter.py
-
-# Run the custom landmark detection model
-python ./CustomModels/landMark_DetectionModel/testModel.py
-
-# Run the custom image classification model
-python ./CustomModels/imageClassificationModel/imageClassificationTest.py
-
-# Setup intellisence for vscode:
-https://stackoverflow.com/a/49893298
 
 # Some Resources Used:
 
