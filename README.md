@@ -12,7 +12,10 @@ activate the environment (check the table with "Command to activate virtual envi
 https://docs.python.org/3/library/venv.html
 
 Then install the dependencies:
-pip install -r requirements.txt
+pip install -r requirements.txt 
+
+
+
 
 Then you can run the game:
 python main.py
