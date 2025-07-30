@@ -1,8 +1,28 @@
 # Computer Vision Fitness Runner
 Project Run is a real-time pose-controlled endless runner game built in Python using Pygame and OpenCV. Instead of using keyboard inputs, the game detects real squats via webcam and uses them to control the character. This gamifies fitness through computer vision and AI! 
 
-## Experiencing the Game first-hand!
-To test the game live, you can **clone the repository and run the file "main.py"**
+## Experiencing the Game first-hand! - Setup:
+Follow these steps to set up and run the project locally!
+
+### 1. Set Up a Virtual Environment:
+Make sure you have **Python 3.10.x** installed.  
+
+Install `virtualenv` if you haven’t already:
+pip install virtualenv
+
+Then create a new virtual environment:
+python -m venv .venv
+
+After that activate the environment (check the table with "Command to activate virtual environment"):
+https://docs.python.org/3/library/venv.html
+
+Then install the dependencies:
+pip install -r requirements.txt 
+
+Finally, you can than run the game on your local computer by running this file **"main.py"**
+
+
+
 
 
 ## Custom Pose Landmark Detection (CNN Model)
@@ -60,9 +80,9 @@ Each image is labeled with 6 keypoints (12 values: x1, y1, ..., x6, y6). Some po
 
 
 
-# Setup:
+## Setup:
 
-Install venv: 
+First install the venv: 
 https://pypi.org/project/virtualenv/
 
 You should use python version 3.10.x
@@ -75,9 +95,6 @@ https://docs.python.org/3/library/venv.html
 
 Then install the dependencies:
 pip install -r requirements.txt 
-
-
-------
 
 Then you can run the game:
 python main.py
