@@ -33,6 +33,7 @@ if __name__ == '__main__':
     screen_scroll = 0
     scroll_offset = 0
     game_start = False
+    instruction_page_shown = False
     score = 0
     high_score = 0
     squat_count = 0
@@ -392,9 +393,16 @@ if __name__ == '__main__':
 
             clock.tick(FPS) # I think it waits to make sure there is a max of 60 frames per second
 
-            if game_start == False:
+            if game_start == False and instruction_page_shown == False:
+                # Show main menu
                 screen.fill(BLACK)
                 screen.blit(main_menu_img, main_menu_rect)
+            elif game_start == False and instruction_page_shown == True:
+                # Show instruction screen
+                screen.fill(BLACK)
+                draw_text_with_outline("          Make sure you are facing the camera   ", FONT, GREY, BLACK, 40, SCREEN_HEIGHT // 2 - 60)
+                draw_text_with_outline("          with your hips, knees and ankles visible    ", FONT, GREY, BLACK, 40, SCREEN_HEIGHT // 2 - 10)
+                draw_text_with_outline("          Press SPACE to start the game    ", FONT, GREY, BLACK, 40, SCREEN_HEIGHT // 2 + 50)
             else:
                 # update background
                 if -scroll_offset > bg_images[0].get_width() * (num_backgrounds - 2):
@@ -500,7 +508,10 @@ if __name__ == '__main__':
                         is_game_loop_running = False
                         quit = True
                     if event.key == pygame.K_SPACE and game_start == False:
-                        game_start = True
+                        if instruction_page_shown == False:
+                            instruction_page_shown = True  # show instruction page next
+                        else:
+                            game_start = True  # start the game after instruction screen
                     if event.key == pygame.K_r and player.alive == False:
                         is_game_loop_running = False
                     if event.key == pygame.K_m and player.alive == False:
