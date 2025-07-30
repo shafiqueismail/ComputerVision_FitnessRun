@@ -15,7 +15,7 @@ Then install the dependencies:
 pip install -r requirements.txt 
 
 
-
+------
 
 Then you can run the game:
 python main.py
