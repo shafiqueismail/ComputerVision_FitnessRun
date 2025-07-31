@@ -84,6 +84,10 @@ Each image is labeled with 6 keypoints (12 values: x1, y1, ..., x6, y6). Some po
 # Example of game-play!
 <img width="752" height="422" alt="image" src="https://github.com/user-attachments/assets/cd743cc0-b653-4d1f-ad4e-c644815d1427" />
 
+# Landmark Detection using Custom Trained Model:
+<img width="357" height="557" alt="Screenshot 2025-07-31 at 2 23 03 PM" src="https://github.com/user-attachments/assets/07c04650-9228-403d-9377-4645a1d33160" />
+
+
 # Research Paper:
 You can look at this file in the repository for the research paper: ConferencePaperIEEE_IsmailShafique_AdamAtamnia (4).pdf
 
